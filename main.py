@@ -4,7 +4,7 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer
 import pyqtgraph as pg
 
-
+#Test
 class ControlPanel(QWidget):
     class RecordingContainer(QWidget):
         def __init__(self):
