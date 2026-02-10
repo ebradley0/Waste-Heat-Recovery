@@ -9,6 +9,7 @@ class ControlPanel(QWidget):
     class RecordingContainer(QWidget):
         def __init__(self):
             super().__init__()
+           
             self.layout = QHBoxLayout()
             self.setLayout(self.layout)
             self.start_button = QPushButton("Start Recording")
@@ -17,7 +18,8 @@ class ControlPanel(QWidget):
             self.layout.addWidget(self.stop_button)
     def __init__(self):
         super().__init__()
-        
+        self.live_updates = True
+        self.plot_widgets = [] # Internal reference to plotwidgets. Will be added by Main Window, so control panel can access and read the plots
         self.setMinimumWidth(250)
         self.init_ui()
     
@@ -33,6 +35,8 @@ class ControlPanel(QWidget):
         self.recording_container = self.RecordingContainer()
         self.test_status = QLabel("Test Status: Not Active")
         self.test_status.setAlignment(Qt.AlignCenter)
+        self.scope_toggle = QPushButton("Toggle Live Updates") # Button to toggle the scope view, which is updated live
+        self.scope_toggle.clicked.connect(self.toggle_scope)
         # Connecting the buttons to functions
         self.recording_container.start_button.clicked.connect(self.start_recording)
         self.recording_container.stop_button.clicked.connect(self.stop_recording)
@@ -40,12 +44,23 @@ class ControlPanel(QWidget):
 
         #Now that all the widgets exist, add them to the layout
         self.layout.addWidget(self.title)
+        self.layout.addWidget(self.scope_toggle)
         self.layout.addWidget(self.duration_selection)
         self.layout.addWidget(self.duration)
         self.layout.addWidget(self.recording_container)
         self.layout.addWidget(self.test_status)
         #Stopping everything from expanding to the full height of the control panel
         self.layout.addStretch() 
+    def toggle_scope(self):
+        for plot_widget in self.plot_widgets:
+            plot_widget.x_data.clear()
+            plot_widget.y_data.clear()
+        if self.live_updates:
+            self.live_updates = False
+            self.scope_toggle.setText("Enable Live Updates")
+        else:
+            self.live_updates = True
+            self.scope_toggle.setText("Disable Live Updates")
 
     def start_recording(self):
         self.test_status.setText("Test Status: Active")
@@ -57,6 +72,7 @@ class ControlPanel(QWidget):
     def add_button(self, button):
         self.layout.addWidget(button)
 class PlotWidget(QWidget):
+    
     def __init__(self):
         super().__init__()
         self.title = ""
@@ -146,17 +162,20 @@ class MainWindow(QMainWindow):
         #Helper function to add plot widgets
     def add_plot(self, plot_widget, row=0, col=0):
         self.plot_holder.layout.addWidget(plot_widget, row, col)
+        self.control_panel.plot_widgets.append(plot_widget) # Add the plot widget to the control panel's internal list for access when reading serial data
 
 
     def read_serial(self):
-        # Read data from serial port and update plots
-        for i in range(self.plot_holder.layout.count()):
-            plot_widget = self.plot_holder.layout.itemAt(i).widget()
-            if isinstance(plot_widget, PlotWidget):
-                x, y = self.generate_dummy_data() # Replace with actual serial data reading
-                self.serial_logger.update_serial_data(f"{plot_widget.title} Time: {x:.2f}s, Value: {y:.2f}") # Log the data to the serial logger
-                plot_widget.update_plot(x, y)
-        pass
+        # Read data from serial port and update plots, so long as live updates is enabled
+        x, y = self.generate_dummy_data() # Replace with actual serial data reading
+        if self.control_panel.live_updates:
+            for i in range(self.plot_holder.layout.count()):
+                plot_widget = self.plot_holder.layout.itemAt(i).widget()
+                if isinstance(plot_widget, PlotWidget):
+                    
+                    self.serial_logger.update_serial_data(f"{plot_widget.title} Time: {x:.2f}s, Value: {y:.2f}") # Log the data to the serial logger
+                    plot_widget.update_plot(x, y)
+            pass
 
     def generate_dummy_data(self):
         self.time += 0.02 # Increment time by 20 milliseconds for each update
