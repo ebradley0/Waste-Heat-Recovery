@@ -75,15 +75,17 @@ class PlotWidget(QWidget):
     
     def __init__(self):
         super().__init__()
+        
         self.title = ""
         self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setMouseEnabled(x=False, y=False)
         layout = QVBoxLayout()
         layout.addWidget(self.plot_widget) # The layout will own the canvas we made, AKA the grapph
         self.setLayout(layout) # Use our layout in this widget
         #Storing the data
         self.x_data = []
         self.y_data = []
-        self.line = self.plot_widget.plot(self.x_data, self.y_data) # Line that will be updated based on data, similair to a scope trace
+        self.line = self.plot_widget.plot(self.x_data, self.y_data, pen=pg.mkPen(color='y', width=1.4)) # Line that will be updated based on data, similair to a scope trace
     
     def configure_plot(self, xaxis_label, yaxis_label, title):
         self.plot_widget.setLabel('left', yaxis_label)
@@ -95,7 +97,6 @@ class PlotWidget(QWidget):
         self.y_data.append(y)
         self.x_data = self.x_data[-100:] # Rotating buffer so the graph doesn't get too crowded
         self.y_data = self.y_data[-100:]
-        self.line.setData(self.x_data, self.y_data)
         self.line.setData(self.x_data, self.y_data) # Update the line with new data
 
 class MainWindow(QMainWindow):
@@ -133,6 +134,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Waste Heat Recovery System")
         self.timer = QTimer()
+
         self.timer.setInterval(20) # Set the timer to update every 20 milliseconds (50 updates per second)  
         self.time = 0 # Internal time tracking for dummy data
         self.timer.timeout.connect(self.read_serial)
@@ -140,6 +142,27 @@ class MainWindow(QMainWindow):
         self.timer.start() # Start the timer to read serial data and update plots
 
     def build_ui(self):
+        self.setStyleSheet("""
+            QWidget {
+                font-family: Roboto;}
+            QMainWindow {
+                background-color: #3C3C3C;
+            }
+            QLabel {
+                color: white;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            QPushButton {
+                background-color: #F2C57C;
+                color: black;
+                border-radius: 2px;
+                padding: 5px;
+            }
+            QComboBox {
+                background-color: #F2C57C;
+                           }
+        """)
         center_widget = QWidget()
         self.setCentralWidget(center_widget)
         # Layout for the central widget. The central widget has possesion of the whole window, so we can use it to set the layout for the entire window.
