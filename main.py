@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayou
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
 import pyqtgraph as pg
+import serial
 
 #Test
 class ControlPanel(QWidget):
@@ -78,7 +79,7 @@ class PlotWidget(QWidget):
         
         self.title = ""
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setMouseEnabled(x=False, y=False)
+        self.plot_widget.setMouseEnabled(x=True, y=False)
         layout = QVBoxLayout()
         layout.addWidget(self.plot_widget) # The layout will own the canvas we made, AKA the grapph
         self.setLayout(layout) # Use our layout in this widget
@@ -95,11 +96,15 @@ class PlotWidget(QWidget):
     def update_plot(self, x, y):
         self.x_data.append(x)
         self.y_data.append(y)
-        self.x_data = self.x_data[-100:] # Rotating buffer so the graph doesn't get too crowded
-        self.y_data = self.y_data[-100:]
+        self.x_data = self.x_data # Rotating buffer so the graph doesn't get too crowded
+        self.y_data = self.y_data
         self.line.setData(self.x_data, self.y_data) # Update the line with new data
 
+    def get_title(self):
+        return self.title
+
 class MainWindow(QMainWindow):
+    
     class PlotHolder(QWidget):
         #Container for the plots as well as serial logger, using grid layout
         def __init__(self):
@@ -134,10 +139,21 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Waste Heat Recovery System")
         self.timer = QTimer()
-
-        self.timer.setInterval(20) # Set the timer to update every 20 milliseconds (50 updates per second)  
+        self.buffer = ""
+        self.serial = serial.Serial(port='COM3', baudrate=115200, timeout=0)
+        self.rpm = 0
+        self.depth = 0
+        self.temp0 = 0
+        self.temp1 = 0
+        self.timer.setInterval(10) # Set the timer to update every 20 milliseconds (50 updates per second)  
         self.time = 0 # Internal time tracking for dummy data
         self.timer.timeout.connect(self.read_serial)
+        self.plots = {
+                "RPM": PlotWidget(),
+                "Water Level": PlotWidget(),
+                "Temp sensor 0": PlotWidget(),
+                "Temp sensor 1": PlotWidget()
+        }
         self.build_ui()
         self.timer.start() # Start the timer to read serial data and update plots
 
@@ -160,7 +176,8 @@ class MainWindow(QMainWindow):
                 padding: 5px;
             }
             QComboBox {
-                background-color: #F2C57C;
+                background-color: White;
+                color: Black;
                            }
         """)
         center_widget = QWidget()
@@ -177,9 +194,15 @@ class MainWindow(QMainWindow):
         # Plot window config
         self.plot_holder = self.PlotHolder()
         self.layout.addWidget(self.plot_holder)
+        self.add_plot(self.plots["RPM"], 0,0)
+        self.add_plot(self.plots["Water Level"],0,1)
+        self.add_plot(self.plots["Temp sensor 0"],1,0)
+        self.add_plot(self.plots["Temp sensor 1"],1,1)
         #Serial Logger config, owned by grid in pos 3,0
         self.serial_logger = self.SerialLogger()
         self.plot_holder.layout.addWidget(self.serial_logger, 3, 0, 1, 2) # Row 3, Column 0, Row Span 1, Column Span 2
+
+
 
 
         #Helper function to add plot widgets
@@ -188,41 +211,48 @@ class MainWindow(QMainWindow):
         self.control_panel.plot_widgets.append(plot_widget) # Add the plot widget to the control panel's internal list for access when reading serial data
 
 
-    def read_serial(self):
-        # Read data from serial port and update plots, so long as live updates is enabled
-        x, y = self.generate_dummy_data() # Replace with actual serial data reading
-        if self.control_panel.live_updates:
-            for i in range(self.plot_holder.layout.count()):
-                plot_widget = self.plot_holder.layout.itemAt(i).widget()
-                if isinstance(plot_widget, PlotWidget):
-                    
-                    self.serial_logger.update_serial_data(f"{plot_widget.title} Time: {x:.2f}s, Value: {y:.2f}") # Log the data to the serial logger
-                    plot_widget.update_plot(x, y)
-            pass
+    
 
-    def generate_dummy_data(self):
-        self.time += 0.02 # Increment time by 20 milliseconds for each update
-        return self.time, np.random.random() * 100  # Dummy data simulating a wave pattern
+    def read_serial(self):
+        # Read data from serial port and update plots, so long as live updates is enableis
+
+       
+        data = self.serial.readline().decode('utf-8', errors='ignore')
+
+        self.buffer += data
         
+
+
+            # Process only complete lines
+        if "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            line = line.strip()
+         
+
+            if line.startswith("RPM:"):
+                print("RPM", self.rpm)
+                self.rpm = float(line.split(":")[1])
+            elif line.startswith("Water Level:"):
+                self.water_level = int(line.split(":")[1])
+            elif line.startswith("Temp sensor 0:"):
+                self.temp0 = float(line.split(":")[1])
+            elif line.startswith("Temp sensor 1:"):
+                self.temp1 = float(line.split(":")[1])
+        
+        self.time += 0.01
+        self.update_plots()
+        
+    def update_plots(self):
+        if self.control_panel.live_updates:
+            if self.plots["RPM"]:
+                rpm_plot = self.plots["RPM"]
+                rpm_plot.update_plot(self.time, self.rpm)
 
 
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     #Adding a bunch of placeholder plots
-    plot1 = PlotWidget()
-
-    plot1.configure_plot("X-axis", "Y-axis", "RPM")
-    plot2 = PlotWidget()
-    plot2.configure_plot("Time", "Value", "Water Vs Ambient Temperature")
-    plot3 = PlotWidget()
-    plot3.configure_plot("Time", "Value", "Voltage")
-    plot4 = PlotWidget()
-    plot4.configure_plot("Time", "Value", "Current")
-    window.add_plot(plot1, 0, 0)
-    window.add_plot(plot2, 0, 1)
-    window.add_plot(plot3, 1, 0)
-    window.add_plot(plot4, 1, 1)
     #Finally show the window
     window.show()
 
