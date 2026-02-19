@@ -60,7 +60,7 @@ void loop() {
 
 
 
-  delay(5000);
+  delay(10);
 
 
 }
@@ -71,6 +71,7 @@ void calc_rpm()
   long deltaT = now - last;
   last = now;
   rpm = (60000000.0) / deltaT; // Converintg 60s to microseconds since deltaT is in terms of micros.
+  rpm = rpm/4;
   // revolutions per second = 1 / time since last revolution, so RPM is 60 * rps, or 60 / deltaT.
 }
 
