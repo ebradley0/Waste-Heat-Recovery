@@ -4,10 +4,16 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer
 import pyqtgraph as pg
 import serial
+from PySide6.QtCore import Signal
+import csv
+import time
 
 #Test
 class ControlPanel(QWidget):
+    recording_started = Signal(int)
+    recording_stopped = Signal()
     class RecordingContainer(QWidget):
+     
         def __init__(self):
             super().__init__()
            
@@ -65,10 +71,25 @@ class ControlPanel(QWidget):
 
     def start_recording(self):
         self.test_status.setText("Test Status: Active")
-        pass
+        duration = self.get_duration()
+        self.recording_started.emit(duration)
+
     def stop_recording(self):
         self.test_status.setText("Test Status: Not Active")
-        pass
+        self.recording_stopped.emit()
+
+
+    def get_duration(self):
+        duration_string = self.duration_selection.currentText()
+        if "Minutes" in duration_string:
+            minutes = int(duration_string.split(" ")[0])
+            return minutes * 60
+        else:
+            hours = int(duration_string.split(" ")[0])
+            return hours * 3600
+
+
+            
     
     def add_button(self, button):
         self.layout.addWidget(button)
@@ -145,6 +166,8 @@ class MainWindow(QMainWindow):
         self.depth = 0
         self.temp0 = 0
         self.temp1 = 0
+        self.recording = False
+        self.recording_duration_remaining = 0
         self.timer.setInterval(10) # Set the timer to update every 20 milliseconds (50 updates per second)  
         self.time = 0 # Internal time tracking for dummy data
         self.timer.timeout.connect(self.read_serial)
@@ -155,6 +178,9 @@ class MainWindow(QMainWindow):
                 "Temp sensor 1": PlotWidget()
         }
         self.build_ui()
+        self.control_panel = ControlPanel()
+        self.control_panel.recording_started.connect(self.recording_started)
+        self.control_panel.recording_stopped.connect(self.recording_stopped)
         self.timer.start() # Start the timer to read serial data and update plots
 
     def build_ui(self):
@@ -187,7 +213,6 @@ class MainWindow(QMainWindow):
         self.layout.setAlignment(Qt.AlignTop)
         center_widget.setLayout(self.layout)
         # Control Panel Config
-        self.control_panel = ControlPanel()
         self.layout.addWidget(self.control_panel)
         
         
@@ -211,6 +236,20 @@ class MainWindow(QMainWindow):
         self.control_panel.plot_widgets.append(plot_widget) # Add the plot widget to the control panel's internal list for access when reading serial data
 
 
+
+    def recording_started(self, duration):
+        self.recording = True
+        self.recording_duration_remaining = duration
+        self.csv_file = open("data.csv", "w", newline="")
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(["Time (s)", "RPM", "Water Level", "Temp 0", "Temp 1"])
+        self.start_time= time.time()
+        pass
+    def recording_stopped(self):
+        self.recording = False
+        self.csv_file.close()
+        pass
+
     
 
     def read_serial(self):
@@ -221,6 +260,7 @@ class MainWindow(QMainWindow):
 
         self.buffer += data
         
+        elapsed_time = time.time() - self.start_time
 
 
             # Process only complete lines
@@ -230,7 +270,6 @@ class MainWindow(QMainWindow):
          
 
             if line.startswith("RPM:"):
-                print("RPM", self.rpm)
                 self.rpm = float(line.split(":")[1])
             elif line.startswith("Water Level:"):
                 self.water_level = int(line.split(":")[1])
@@ -239,7 +278,17 @@ class MainWindow(QMainWindow):
             elif line.startswith("Temp sensor 1:"):
                 self.temp1 = float(line.split(":")[1])
         
-        self.time += 0.01
+        self.time += elapsed_time
+
+        if self.recording:
+            self.csv_writer.writerow([self.time, self.rpm, self.water_level, self.temp0, self.temp1])
+            pass
+
+        if self.recording_duration_remaining <= 0:
+            self.recording_stopped()
+        else:
+            self.recording_duration_remaining -= elapsed_time
+
         self.update_plots()
         
     def update_plots(self):
@@ -247,6 +296,15 @@ class MainWindow(QMainWindow):
             if self.plots["RPM"]:
                 rpm_plot = self.plots["RPM"]
                 rpm_plot.update_plot(self.time, self.rpm)
+            if self.plots["Water level"]:
+                water_plot = self.plots["Water level"]
+                water_plot.update_plot(self.time, self.water_level)
+            if self.plots["Temp sensor 0"]:
+                temp_0_plot = self.plots("Temp sensor 0")
+                temp_0_plot.update_plot(self.time, self.temp0)
+            if self.plots["Temp sensor 1"]:
+                temp_0_plot = self.plots("Temp sensor 1")
+                temp_0_plot.update_plot(self.time, self.temp0)
 
 
 def main():
