@@ -164,12 +164,14 @@ class MainWindow(QMainWindow):
         self.serial = serial.Serial(port='COM3', baudrate=115200, timeout=0)
         self.rpm = 0
         self.depth = 0
+        self.water_level = 0
         self.temp0 = 0
         self.temp1 = 0
         self.recording = False
         self.recording_duration_remaining = 0
         self.timer.setInterval(10) # Set the timer to update every 20 milliseconds (50 updates per second)  
         self.time = 0 # Internal time tracking for dummy data
+        self.start_time = time.time()
         self.timer.timeout.connect(self.read_serial)
         self.plots = {
                 "RPM": PlotWidget(),
@@ -177,8 +179,9 @@ class MainWindow(QMainWindow):
                 "Temp sensor 0": PlotWidget(),
                 "Temp sensor 1": PlotWidget()
         }
-        self.build_ui()
         self.control_panel = ControlPanel()
+        self.build_ui()
+       
         self.control_panel.recording_started.connect(self.recording_started)
         self.control_panel.recording_stopped.connect(self.recording_stopped)
         self.timer.start() # Start the timer to read serial data and update plots
@@ -271,23 +274,23 @@ class MainWindow(QMainWindow):
 
             if line.startswith("RPM:"):
                 self.rpm = float(line.split(":")[1])
-            elif line.startswith("Water Level:"):
+            if line.startswith("Water Level:"):
                 self.water_level = int(line.split(":")[1])
-            elif line.startswith("Temp sensor 0:"):
+            if line.startswith("Temp sensor 0:"):
                 self.temp0 = float(line.split(":")[1])
-            elif line.startswith("Temp sensor 1:"):
+            if line.startswith("Temp sensor 1:"):
                 self.temp1 = float(line.split(":")[1])
         
-        self.time += elapsed_time
+        self.time = elapsed_time
 
         if self.recording:
             self.csv_writer.writerow([self.time, self.rpm, self.water_level, self.temp0, self.temp1])
             
 
-        if self.recording_duration_remaining <= 0:
-            self.recording_stopped()
-        else:
-            self.recording_duration_remaining -= elapsed_time
+            if self.recording_duration_remaining <= 0:
+                self.recording_stopped()
+            else:
+                self.recording_duration_remaining -= elapsed_time
 
         self.update_plots()
         
@@ -296,14 +299,14 @@ class MainWindow(QMainWindow):
             if self.plots["RPM"]:
                 rpm_plot = self.plots["RPM"]
                 rpm_plot.update_plot(self.time, self.rpm)
-            if self.plots["Water level"]:
-                water_plot = self.plots["Water level"]
+            if self.plots["Water Level"]:
+                water_plot = self.plots["Water Level"]
                 water_plot.update_plot(self.time, self.water_level)
             if self.plots["Temp sensor 0"]:
-                temp_0_plot = self.plots("Temp sensor 0")
+                temp_0_plot = self.plots["Temp sensor 0"]
                 temp_0_plot.update_plot(self.time, self.temp0)
             if self.plots["Temp sensor 1"]:
-                temp_0_plot = self.plots("Temp sensor 1")
+                temp_0_plot = self.plots["Temp sensor 1"]
                 temp_0_plot.update_plot(self.time, self.temp0)
 
 
