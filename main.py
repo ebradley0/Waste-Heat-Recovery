@@ -244,11 +244,11 @@ class MainWindow(QMainWindow):
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(["Time (s)", "RPM", "Water Level", "Temp 0", "Temp 1"])
         self.start_time= time.time()
-        pass
+        
     def recording_stopped(self):
         self.recording = False
         self.csv_file.close()
-        pass
+        
 
     
 
@@ -282,7 +282,7 @@ class MainWindow(QMainWindow):
 
         if self.recording:
             self.csv_writer.writerow([self.time, self.rpm, self.water_level, self.temp0, self.temp1])
-            pass
+            
 
         if self.recording_duration_remaining <= 0:
             self.recording_stopped()
