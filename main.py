@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QGridLayout, QLabel, QComboBox, QPlainTextEdit
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QGridLayout, QLabel, QComboBox, QPlainTextEdit, QLineEdit
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
 import pyqtgraph as pg
@@ -27,6 +27,8 @@ class ControlPanel(QWidget):
         super().__init__()
         self.live_updates = True
         self.plot_widgets = [] # Internal reference to plotwidgets. Will be added by Main Window, so control panel can access and read the plots
+        self.title_textbox = QLineEdit()
+        self.title_textbox.setPlaceholderText("Enter title here")
         self.setMinimumWidth(250)
         self.init_ui()
     
@@ -54,6 +56,7 @@ class ControlPanel(QWidget):
         self.layout.addWidget(self.scope_toggle)
         self.layout.addWidget(self.duration_selection)
         self.layout.addWidget(self.duration)
+        self.layout.addWidget(self.title_textbox)
         self.layout.addWidget(self.recording_container)
         self.layout.addWidget(self.test_status)
         #Stopping everything from expanding to the full height of the control panel
@@ -170,7 +173,7 @@ class MainWindow(QMainWindow):
         self.recording = False
         self.recording_duration_remaining = 0
         self.timer.setInterval(10) # Set the timer to update every 20 milliseconds (50 updates per second)  
-        self.time = 0 # Internal time tracking for dummy data
+        self.time = 0 # Internal time tracking 
         self.start_time = time.time()
         self.timer.timeout.connect(self.read_serial)
         self.plots = {
@@ -243,7 +246,9 @@ class MainWindow(QMainWindow):
     def recording_started(self, duration):
         self.recording = True
         self.recording_duration_remaining = duration
-        self.csv_file = open("data.csv", "w", newline="")
+        self.recording_title = self.control_panel.title_textbox.text()
+        date = time.strftime("%Y-%m-%d")
+        self.csv_file = open('{self.recording_title}_{date}.csv', "w", newline="")
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(["Time (s)", "RPM", "Water Level", "Temp 0", "Temp 1"])
         self.start_time= time.time()
