@@ -8,6 +8,8 @@
 // put function declarations here:
 void calc_rpm();
 int read_water_level();
+float read_dc_voltage();
+float read_dc_current();
 void printAddress(DeviceAddress deviceAddress);
 
 volatile float rpm = 0;
@@ -25,6 +27,7 @@ void setup() {
   // put your setup code here, to run once:
   // Interrupt Configuration
   Serial.begin(115200);
+  analogReference(INTERNAL); // Set the reference voltage for the ADC to 1.1V, which is more suitable for low voltage measurements like water level and DC voltage.
   // Temp sensor configs
 
   sensors.begin();
@@ -56,11 +59,16 @@ void loop() {
   Serial.print("Temp sensor 1: ");
   Serial.println(sensors.getTempF(temp_sensor_1));
   
+  Serial.print("DC Voltage: ");
+  Serial.println(read_dc_voltage());
+
+  Serial.print("DC Current: ");
+  Serial.println(read_dc_current(), 6);
   
 
 
 
-  delay(10);
+  delay(1000);
 
 
 }
@@ -86,4 +94,19 @@ void printAddress(DeviceAddress deviceAddress) {
     if (deviceAddress[i] < 16) Serial.print("0");
     Serial.print(deviceAddress[i], HEX);
   }
+}
+
+float read_dc_voltage()
+{
+  int analog_value = analogRead(A0);
+  float voltage = (analog_value * 1.1) / 1023.0 * (56+120) / 56; // 10 bit adc, using internal 1.1V reference
+  return voltage;
+}
+
+float read_dc_current()
+{
+  int analog_value = analogRead(A3);
+  float voltage = (float(analog_value) * 1.1) / 1023.0f; // 10 bit adc, using internal 1.1V reference
+  float current = float(voltage) / 22.0f; // 22 ohm shunt. Would be voltage - ground / R but ground is 0V so just voltage / R.
+  return current;
 }
